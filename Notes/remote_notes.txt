@@ -1,0 +1,121 @@
+Remote program queue in eeprom:
+The external EEPROM inside the botley remote is an ATMEL 24C02BN which stores 2048 bits of data. Datasheet: http://ww1.microchip.com/downloads/en/devicedoc/doc5126.pdf
+Thats 256 addresses, each containing 8 bits. Each address in the EEPROM stores a value which corresponds to a button/motion command on botley's remote.
+Commands are stored in the eeprom starting at address 0x01 so the second command is located at 0x02 and so on.
+Commands are read from the eeprom in sequence.
+
+The EEPROM communicates over i2C so I was able to dump the contents of the eeprom using an Arduino Uno.
+Pin Map:
+Arduino Pin     EEPROM Pin      Note
+GND             GND - 4
+3.3v            VCC - 8         Put on a switch or leave disconnected for now
+SDA - A4        SDA - 5
+SCL - A5        SCL - 6
+
+Dumping the eeprom:
+Once the Uno is connected to the EEPROM according to the pin map above (with 3.3v switched off) upload the following
+code to the arduino. This code will iterate over the memory addresses in the chip and print the contents to the serial monitor.
+
+Arduino EEPROM dump Code:
+
+#include <Wire.h>
+#include <stdint.h>
+
+#define AT24C02_ADDR 0x50
+
+void setup() {
+  uint8_t dataAddr = 0x00;
+  Serial.begin(9600);
+  while (!Serial) {
+    ; // wait for serial port to connect.
+  }
+  Wire.begin();
+  Wire.beginTransmission(AT24C02_ADDR);
+  Wire.write(dataAddr); //Sets the start address for use in the upcoming reads
+  Wire.endTransmission();
+  for(uint8_t i=0;i<8;++i){ //cycle through enough times to capture entire EEPROM
+    Wire.requestFrom(AT24C02_ADDR,32,1); //read 32 bytes at a time
+    while (Wire.available()){
+      uint8_t c = Wire.read();
+      Serial.print(dataAddr);
+      Serial.print("\t");
+      Serial.println(c, HEX); //Send raw data over serial to computer
+      dataAddr += 1;
+    }
+  }
+  dataAddr = 0x00;
+}
+
+void loop() {
+}
+
+Loop Button:
+When you press the loop button for the first time the remote records the subsequent commands in memory as usual.
+When you press loop again, the commands you recorded are appended in memory. There is no "loop" command stored
+in memory.
+Example:
+
+Addr    Value   Command
+0	    255     Addr 0 is always 255
+1	    5       L45
+2	    5       L45
+3	    5       L45
+-- Pressed Loop Button --
+4	    1       Fwd
+5	    2       Bck
+6	    3       L90
+-- Pressed Loop Button Again --
+7	    1       Fwd
+8	    2       Bck
+9	    3       L90
+-- The above steps were added to memory the second time loop is pressed --
+10	    4       R90
+11	    5       L45
+12	    6       R45
+
+
+
+Light Button:
+The light button is not stored in memory.
+
+
+Object Detection:
+With object detection enabled, different values are stored in memory for each move command
+
+Addr    Command    Normal      OD_on
+0	    N/A        255         255
+1	    FWD        1           9
+2	    BCK        2           10
+3	    L90        3           11
+4	    R90        4           12
+5	    L45        5           13
+6	    R45        6           14
+
+Botley Says (game):
+The following command sequence will initiate a game of Botley Says (like Simon says)
+FWD, R90, BCK, L90
+
+If you read the memory after pushing those buttons but before pressing transmit, the normal command values are stored in memory.
+However, when you press transmit then read the memory again, some values change:
+
+Addr    Command    Normal      After Transmit
+0	    N/A        255         255
+1	    FWD        1           103
+2       R90        4           68
+3	    BCK        2           2
+4	    L90        3           3
+
+If you enter new commands after pressing transmit they are added to memory like normal but instead of appending to the
+previous commands (like normal) they are written at address 1 onward as if we had cleared our program (but we never cleared it)
+I suspect that the remote recognizes the sequence to start the game so it either:
+- Changes the values at addr 1 and 2 before transmitting and these new values initiate the game
+- These new values tell the remote to clear the program
+- Maybe 103 initiates the game and 68 flags the remote to clear the program?
+
+I'm guessing that this sequence can only be activated if these commands are the first in memory. This would prevent
+"Botley Says" from starting if these commands happened to be programmed in the middle of a motion program.
+
+
+Botley's Seceret Codes (botley makes sounds when these sequences are entered)
+
+
