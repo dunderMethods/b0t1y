@@ -1,0 +1,72 @@
+I'm going to explain my interpretation of the Botley IR protocol so far:
+Rules: [Header = 4150, Mark = 642, Space1 = Mark, Space0 = Mark * 2]
+
+A message is composed of bursts with long silence between: Message = [burst_1]......[burst_2]......[burst_n]......
+A burst is composed of: [header, byte_1, byte_2] for a total of 16 bits of data per burst.
+A Burst begins with a header which is just a long Mark (~ Mark * 6.5)
+Each bit, following the header, is composed of some space followed by a constant-width Mark.
+The length of the space determines the binary value.
+The marks are basically just delimiters, we don't really care about them.
+The length of a space can either be Mark*1 = binary 0, Mark*2 = binary 1, S > Mark*3 = end of burst
+
+Anatomy of a single burst of data:
+SS MMMMMMM S M SS M SS M SS M SS M SS M SS M SS M S M S M S M S M S M S M S M S M SSSSS
+__|-------|_|-|__|-|__|-|__|-|__|-|__|-|__|-|__|-|_|-|_|-|_|-|_|-|_|-|_|-|_|-|_|-|_____
+  [HEADER][0   1    1    1    1    1    1    1  ][0   0   0   0   0   0   0   0  ]
+Decoded HEX:          byte_1: [7F]                          byte_2: [00]
+
+Each byte is composed of 8 bits where:
+- Assuming no variation/transmission loss, each bit's value can be determined by the ratio of [space:mark]:
+bit = 1 if space > mark else 0 | bit = 1 = [space, space:mark] | bit = 0 = [space:mark]
+
+- Since there is always variation in the IR signal we use empiric thresholds to interpret spaces/marks:
+...If (the space is) less than 1000 long its a zero...otherwise a 1...
+
+
+Analysis:
+I've written Botley_IR_Decoding.ipynb which takes an AnalysIR saved session history and decodes each transmission into
+a series of hex values.
+
+Analysis of the hex values reveals several patterns: (See Some_decoded_IR_signals.txt)
+
+In most cases, the first 3 bytes in a message are repeated
+and across most messages the first 8 bytes are the same, Is this the preamble?
+-----
+0: send_L4_F_R4_L9_B_R9 | 1: clear | 2: light
+Byte  0     1     2 |    3     4     5     6     7 |    8     9    10    11    12    13
+0  BF00  BF00  BF00 | 82B1  82B2  82B3  82B4  82B5 | 8501  8102  8603  8304  8205  8406
+1  BF00  BF00  BF00 | 82B1  82B2  82B3  82B4  82B5 | 9601  9601
+2  BF00  BF00  BF00 | 82B1  82B2  82B3  82B4  82B5 | 9901  9901
+
+
+Interestingly, changing the volume level seems to change the preamble
+-----
+sound_L-O: 0 | sound_H-L: 1 | sound_O-H: 2
+      0     1     2 |    3     4     5     6     7 |    8     9
+0  7F00  7F00  7F00 | 42B1  42B2  42B3  42B4  42B5 | 9803  9803
+1  3F00  3F00  3F00 |  2B1   2B2   2B3   2B4   2B5 | 5802  5802
+2  BF00  BF00  BF00 | 82B1  82B2  82B3  82B4  82B5 | 1801  1801
+
+
+The first 3 bytes must have something to do with pairing. When the remote enters pairing mode, the first 3 bytes are 0
+-----
+pairing_init:
+      0     1     2 |    3     4     5     6     7 |    8
+-     0     0     0 |  3B1   AB2   DB3   AB4   DB5 |  101
+
+
+Extracting the data we care about:
+-----
+When I dumped the remote's EEPROM I found the DEC values which correspond with the direction buttons
+Looking at the IR HEX packets I find the same values in the 18th bit. I've found the direction commands in IR
+
+Direction button to EEPROM val:  Direction sequence sent over IR:
+Command    Normal      OD_on  |  0: send_L4_F_R4_L9_B_R9
+FWD        1           9      |  Byte   ...6     7 |  L4  8    F  9   R4 10   L9 11    B 12   R9 13
+BCK        2           10     |  0   ...82B4  82B5 | 8>5<01  8>1<02  8>6<03  8>3<04  8>2<05  8>4<06
+L9         3           11     |
+R9         4           12     |  So it also looks like the "8" could mean "this is a direction command"
+L4         5           13     |  and the numbers following seem like a simple index
+R4         6           14     |
+
+Earlier I had speculated that commands queued with OD-ON would be transmitted as different values
