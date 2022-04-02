@@ -2,7 +2,8 @@ Remote program queue in eeprom:
 The external EEPROM inside the botley remote is an ATMEL 24C02BN which stores 2048 bits of data. Datasheet: http://ww1.microchip.com/downloads/en/devicedoc/doc5126.pdf
 Thats 256 addresses, each containing 8 bits. Each address in the EEPROM stores a value which corresponds to a button/motion command on botley's remote.
 Commands are stored in the eeprom starting at address 0x01 so the second command is located at 0x02 and so on.
-Commands are read from the eeprom in sequence.
+Commands are read from the eeprom in sequence. Botley can only accept 150 commands at a time; I have not determined
+what the remaining 106 bytes of memory are used for.
 
 The EEPROM communicates over i2C so I was able to dump the contents of the eeprom using an Arduino Uno.
 Pin Map:

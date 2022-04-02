@@ -1,4 +1,5 @@
-
+from b0t1y_helpers import parse_direction
+from b0t1y_encoder import build_and_encode
 
 class B0t1yRemote:
 
@@ -37,7 +38,7 @@ class B0t1yRemote:
         else:
             print(f'The Botley command queue currently contains {q_len}/{self.queue_limit} commands:')
             print('Index  |  Command')
-            [print(f'{i}: {command[1].capitalize()}') for command in self.queue]
+            [print(f'{i}: {command[1].capitalize()}') for i, command in enumerate(self.queue)]
 
     def clear_queue(self):
         # A simple method to erase the entire command queue
@@ -59,34 +60,9 @@ class B0t1yRemote:
                 self.queue = self.queue[:start] + self.queue[end+1:]
                 print(f'Commands from index {start} to {end} have been removed from the queue')
 
-    @staticmethod
-    def parse_direction(direction: str):
-        # Accepts a direction command and returns the corresponding binary value that is transmitted to Botley.
-        direction = direction.lower()  # To minimize errors, make sure direction is always lower case
-
-        # The "move" dictionary maps simplified commands to the binary values that will be sent to Botley
-        move = {'f': (1, 'forward'), 'b': (2, 'backward'),
-                'l90': (3, 'left90'), 'r90': (4, 'right90'),
-                'l45': (5, 'left45'), 'r45': (6, 'right45')}
-
-        # The "commands" dictionary maps similar direction inputs to their common simplified "move" commands.
-        # This allows us to say botley.move('forward') or botley.move('f'); both will move Botley forward.
-        commands = {'forward': move['f'], 'backward': move['b'], 'f': move['f'], 'b': move['b'],
-                    'left90': move['l90'], 'right90': move['r90'], 'l90': move['l90'], 'r90': move['r90'],
-                    'left45': move['l45'], 'right45': move['r45'], 'l45': move['l45'], 'r45': move['r45']}
-
-        # Next, "commands[direction]" looks for a "key" in "commands" that matches the "direction" parameter given.
-        # If the "key" is found, the corresponding "value" is returned. In this case, the return value is a "key"
-        # in the "move" dictionary. Because "commands[direction]" is inside of "move[]", the return value of
-        # "commands[direction]" is passed as input to "move[]". "move[]" returns a list containing the
-        # corresponding binary move command and a string that we can use to label the move when we print the queue.
-        command = move[commands[direction]]
-
-        return command
-
     def move(self, direction: str, times=1):
         # Method that accepts "direction" and "times" parameters.
-        command = self.parse_direction(direction)
+        command = parse_direction(direction)
 
         # If we are in interactive mode then the command should be transmitted immediately
         if self.mode == 'interactive':
@@ -115,9 +91,9 @@ class B0t1yRemote:
         # If "times" > 1 then the light command is transmitted or added to the queue "times" times.
         pass
 
-    def transmit(self, command: str):
+    def transmit(self, commands: str, instant=False):
         # This method handles all transmission of commands to Botley.
-        pass
+        encoded = build_and_encode(self.channel, commands, instant=instant)
 
 
     def connection_test(self):
