@@ -70,3 +70,79 @@ L4         5           13     |  and the numbers following seem like a simple in
 R4         6           14     |
 
 Earlier I had speculated that commands queued with OD-ON would be transmitted as different values
+
+
+The volume level seems to affect the leading bit in each packet
+Here I have transmitted the light button once at each volume level
+           0     1     2 |    3     4     5     6     7 |    8     9
+Vol H:  3F00  3F00  3F00 |  2B1   2B2   8B3   2B4   8B5 | 1901  1901
+Vol L:  7F00  7F00  7F00 | 42B1  42B2  48B3  42B4  48B5 | 5901  5901
+Mute:   BF00  BF00  BF00 | 82B1  82B2  88B3  82B4  88B5 | 9901  9901
+
+
+Channel testing: Pressing the light button then re-pairing
+There are 256 permutations of button presses which will result in a unique address when pairing
+3F00  3F00  3F00  2B1       2   B2 | 8   B3 | 2   B4 | 8   B5 |      1901  1901   FBFB Confirmed
+3F00  3F00  3F00  2B1       8   B2 | 2   B3 | 8   B4 | 2   B5 |      1901  1901   BFBF Confirmed
+3F00  3F00  3F00  2B1       4   B2 | 6   B3 | 4   B4 | 6   B5 |      1901  1901   LRLR Confirmed
+3F00  3F00  3F00  2B1       6   B2 | 4   B3 | 6   B4 | 4   B5 |      1901  1901   RLRL Confirmed
+
+I've discovered the address pattern!
+In pairing mode you are asked to press any combination of F B L R direction buttons on the remote.
+Note that the Left-45 and Right-45 buttons are not accepted during pairing.
+The directions map to numeric values and the mapped values become the address bits, in the order entered!
+
+Conversion table:
+F = 2
+L = 4
+R = 6
+B = 8
+
+Take the following "light" command as an example,
+The unique address bits are the first bits of bytes 5-8:
+3F00  3F00  3F00  2B1 |> 6B2  8B3  2B4  4B5 <| 1901  1901
+Use the table above   |  ^    ^    ^    ^    |
+to convert            |  R    B    F    L    |
+
+Between analysis of Volume, Pairing, and observation of commands we're starting to see a clearer picture:
+For instant commands the command bit is C. Instant commands always repeat twice at the end.
+V change with the volume level
+I are indices. In the address block they are constant. In the command block they increase with each additional command
+X are unknown but they don't seem to change under normal conditions ie. sending direction or control commands
+
+Light command sent at different volume levels, last two are different addresses:
+       |       INIT       |            ADDRESS           |   COMMANDS
+Vol H: | 3F00  3F00  3F00 |  2B1   2B2   8B3   2B4   8B5 | 1901  1901
+Vol L: | 7F00  7F00  7F00 | 42B1  42B2  48B3  42B4  48B5 | 5901  5901
+Mute:  | BF00  BF00  BF00 | 82B1  82B2  88B3  82B4  88B5 | 9901  9901
+BFBF:  | 3F00  3F00  3F00 |  2B1   8B2   2B3   8B4   2B5 | 1901  1901
+LRLR:  | 3F00  3F00  3F00 |  2B1   4B2   6B3   4B4   6B5 | 1901  1901
+       | VXXX  VXXX  VXXX | VXII  VAII  VAII  VAII  VAII | ?CII  ?CII
+
+Rules seem to emerge:
+INIT: First bit will be 3, 7, or B (11) (volume based)
+      Subsequent bits are always the same under normal operation
+
+ADDR: First bit will be the first INIT bit minus 3. Ex: 3-3=0, 7-3=4, B(11)-3=8 (volume based)
+      Second bit is always 2
+      Third bit is always B
+      Fourth bit is the address packet index, so the 4th bit of the first byte is 1, 2nd byte is 2 etc
+
+CMDS: It seems the first bit will be the first INIT bit minus 2 (volume based) for control commands (light, volume)
+      Second bit is the command bit.
+
+
+Volume Transmissions:
+      |       INIT       |            ADDRESS           |   COMMANDS
+H-L   | 3F00  3F00  3F00 |  2B1   6B2   8B3   2B4   4B5 | 5802  5802
+L-O   | 7F00  7F00  7F00 | 42B1  46B2  48B3  42B4  44B5 | 9803  9803
+O-H   | BF00  BF00  BF00 | 82B1  86B2  88B3  82B4  84B5 | 1801  1801
+
+Note: H-L indicates the volume level when pushed (H) and the volume we are switching to (L)
+
+Looking at just the command section I notice:
+Bit 1   Seems to match the volume-related pattern of next volume level. For example, look at H-L in the table
+        The INIT section matches what we expect when the vol is high, but the first bit in commands matches what
+        we expect for the volume level we are transitioning to
+Bit 2   Is always 8 for these volume commands.
+Bit 3-4 Seem to indicate the volume level where 01 is high and 03 is off

@@ -1,10 +1,12 @@
-from b0t1y_helpers import parse_direction
+from b0t1y_helpers import *
 import numpy as np
 import time
 
+""" NOTE: Any function names beginning with an underscore '_' are functions you probably shouldn't be calling directly.
+    Functions without the underscore are higher-level functions which could be useful to the user."""
 
 rules = {
-    # These values describe the infrared waveform characteristics
+    # These values describe the infrared waveform characteristics that Botley expects. Don't change them!
     'header':   4150,
     'mark':     642,
     'space0':   1284,
@@ -16,28 +18,32 @@ rules = {
 }
 
 
-def build_address(addr):
-    """ Builds the address bytes at the beginning of each message """
-    rtrn_qty = 3
-    bits = [addr, 'F', '0', '0']
+def _build_init(volume):
+    """ Builds the message initializer block at the beginning of each message """
+    rtrn_qty = 3    # Init block is just the same packet repeated three times
+    bits = [volume[0], 'F', '0', '0']
     return [hex(int(''.join(bits), 16))] * rtrn_qty
 
 
-def build_preamble(addr):
-    """ Builds the preamble bytes at the beginning of each message """
-    rtrn_qty = 5
-    byts = [[str(int(addr, 16) - 3), '2', 'B', str(i)] for i in range(1, rtrn_qty + 1)]
-    return [hex(int(''.join(byte), 16)) for byte in byts]
+def _build_address(volume, address):
+    """ Builds the address block, which comes after the init block of each message """
+    address = '2' + address     # First part of the address block always includes a 2, append our address to it
+    # Below, we iterate over "address" to create a 16-bit address packet for each part of the address
+    # Address packet anatomy: [ volume_bit, address_bit, always 'B', address_packet_index ]
+    packets = [[str(int(volume[1], 16)), address[i], 'B', str(i + 1)] for i in range(len(address))]
+    return [hex(int(''.join(packet), 16)) for packet in packets]
 
 
-def build_message_header(channel):
-    """ Builds the header for each message """
-    address_bytes = build_address(channel)
-    preamble_bytes = build_preamble(channel)
-    return address_bytes + preamble_bytes
+def _build_message_header(volume, address):
+    """ Builds the header (init, address) for each message """
+    vol_bits = volume_map[volume]
+    addr_bits = address_map[address] if address.isalpha() else address
+    init_bytes = _build_init(vol_bits)
+    address_bytes = _build_address(vol_bits, addr_bits)
+    return init_bytes + address_bytes
 
 
-def build_commands(commands):
+def _build_commands(commands):
     """ Accepts a list of user commands and converts them into their HEX equivalents """
     hex_commands = []
     for i, command in enumerate(commands):
@@ -47,10 +53,11 @@ def build_commands(commands):
     return hex_commands
 
 
-def build_instant(command):
-    """ Accepts an instant user command and converts them into its HEX equivalent """
+def _build_instant(command):
+    """ Accepts an instant user command and converts it into its HEX equivalent """
+    # TODO add an instant command parser
     cmd_bit = parse_direction(command)[0]
-    byte = ['9', cmd_bit, '01']
+    byte = ['9', cmd_bit, '0', '1']
     # Instant commands are simply the same hex value repeated twice
     hex_command = [hex(int(''.join(byte), 16))] * 2
     return hex_command
@@ -59,15 +66,15 @@ def build_instant(command):
 def build_message(channel, commands, instant=False):
     """ Builds the complete message that will be encoded and sent """
     # Construct the header which is sent with each transmission
-    message_header = build_message_header(channel)
+    message_header = _build_message_header(channel)
 
     if instant:
         # If the command is instantly transmitted (light, sound, etc) it needs to be built differently
-        user_commands = build_instant(commands)
+        user_commands = _build_instant(commands)
 
     else:
         # Convert the user commands into hex
-        user_commands = build_commands(commands.replace(' ', '').split(','))
+        user_commands = _build_commands(commands.replace(' ', '').split(','))
 
     # Combine the header and all of the commands to create the entire message
     hex_message = message_header + user_commands
@@ -76,38 +83,36 @@ def build_message(channel, commands, instant=False):
 
 
 def encode_botley(message):
-    """ Encodes the contents of the message """
+    """ Encodes the contents of our message into a list of pulse widths which represent zeros and ones"""
     encoded = []
     for data in message:
+        # Convert the hex command to binary
         binary = f'{int(data, 16):16b}'.replace(' ', '0')
+
+        # Use the binary values to construct a series of time periods which constitute the IR waveform
+        # "For each bit in binary, if bit is 1, store a double-space and a mark, otherwise single-space and a mark."
         encode = [[rules['space1'], rules['mark']] if int(bit) else [rules['space0'], rules['mark']] for bit in binary]
+
+        # Use Numpy's ravel method to "flatten" our list-of-lists into a 1D list
         encode = np.array(encode).ravel().tolist()
+
+        # Wrap the encoded command with a packet header and footer
         encode = [rules['header']] + encode + [rules['quiet']]
+
+        # Add the latest packet to the encoded list
         encoded.extend(encode)
     return encoded
 
 
 def build_and_encode(channel, commands, instant=False):
-    message = build_message_header(channel)
+    """ Given a channel and list of commands, Performs end-to-end encoding and returns the encoded data"""
+    message = _build_message_header(channel)
     message.extend(build_message(channel, commands, instant=instant))
     encoded = encode_botley(message)
     return encoded
 
-def carrier(gpio, frequency, micros):
-   """ Generate carrier square wave. """
-   waveform = []
-   cycle = 1000.0 / frequency
-   cycles = int(round(micros/cycle))
-   on = int(round(cycle / 2.0))
-   sofar = 0
-   for c in range(cycles):
-      target = int(round((c+1)*cycle))
-      sofar += on
-      off = target - sofar
-      sofar += off
-      # waveform.append(pigpio.pulse(1 << gpio, 0, on))
-      # waveform.append(pigpio.pulse(0, 1 << gpio, off))
-   return waveform
+
+
 
 #
 # def transmit(message):

@@ -59,6 +59,7 @@ import time
 import json
 import os
 import argparse
+from b0t1y_decoder import decode_rpi
 
 import pigpio # http://abyz.co.uk/rpi/pigpio/python.html
 
@@ -73,14 +74,14 @@ p.add_argument("-f", "--file", help="Filename",       required=True)
 
 p.add_argument('id', nargs='+', type=str, help='IR codes')
 
-p.add_argument("--freq",      help="frequency kHz",   type=float, default=38.0)
+p.add_argument("--freq",      help="frequency kHz",   type=float, default=48.0)
 
 p.add_argument("--gap",       help="key gap ms",        type=int, default=100)
 p.add_argument("--glitch",    help="glitch us",         type=int, default=100)
-p.add_argument("--post",      help="postamble ms",      type=int, default=500)
-p.add_argument("--pre",       help="preamble ms",       type=int, default=500)
+p.add_argument("--post",      help="postamble ms",      type=int, default=100)
+p.add_argument("--pre",       help="preamble ms",       type=int, default=200)
 p.add_argument("--short",     help="short code length", type=int, default=10)
-p.add_argument("--tolerance", help="tolerance percent", type=int, default=10)
+p.add_argument("--tolerance", help="tolerance percent", type=int, default=15)
 
 p.add_argument("-v", "--verbose", help="Be verbose",     action="store_true")
 p.add_argument("--no-confirm", help="No confirm needed", action="store_true")
@@ -375,17 +376,18 @@ if args.record: # Record.
    cb = pi.callback(GPIO, pigpio.EITHER_EDGE, cbf)
 
    # Process each id
-   codes = []
+
    print("Recording")
-   for arg in args.id:
-      print("Press key for '{}'".format(arg))
+   # for arg in args.id:
+   while True:
+      arg= 'Sample'
+      # print("Press key for '{}'".format(arg))
       code = []
       fetching_code = True
       while fetching_code:
          time.sleep(0.1)
-      print("Okay")
+      # print("Okay")
       time.sleep(0.5)
-
 
       if CONFIRM:
          press_1 = code[:]
@@ -414,13 +416,14 @@ if args.record: # Record.
                   done = True
                time.sleep(0.5)
       else: # No confirm.
+         decode_rpi({arg: code[:]})
          records[arg] = code[:]
 
    pi.set_glitch_filter(GPIO, 0) # Cancel glitch filter.
    pi.set_watchdog(GPIO, 0) # Cancel watchdog.
 
    tidy(records)
-
+   decode_rpi(records)
    backup(FILE)
 
    f = open(FILE, "w")
@@ -450,10 +453,10 @@ else: # Playback.
 
    for arg in args.id:
       if arg in records:
-
+         print(f'Playing {arg}...')
          code = records[arg]
 
-         # Create wave
+         # Create wavea
 
          marks_wid = {}
          spaces_wid = {}
@@ -461,7 +464,7 @@ else: # Playback.
          wave = [0]*len(code)
 
          for i in range(0, len(code)):
-            ci = code[i]
+            ci = int(code[i] / 2.1)
             if i & 1: # Space
                if ci not in spaces_wid:
                   pi.wave_add_generic([pigpio.pulse(0, 0, ci)])

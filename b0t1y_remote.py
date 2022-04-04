@@ -1,10 +1,12 @@
 from b0t1y_helpers import parse_direction
 from b0t1y_encoder import build_and_encode
+from b0t1y_transmitter import send_ir
 
 class B0t1yRemote:
 
-    def __init__(self, channel=1, mode='queue'):
+    def __init__(self, channel='FFFF', mode='queue'):
         self.channel = channel              # Up to 4 Botleys can be used at once so there are 4 channels
+        self.volume = 'H'                   # Stores the volume level we are currently at
         self.mode = mode                    # If mode='interactive' then commands are transmitted instantly.
         self.queue_limit = 150              # Botley can store up to 150 commands
         self.queue = []                     # The command queue stores the list of user's commands
@@ -94,7 +96,7 @@ class B0t1yRemote:
     def transmit(self, commands: str, instant=False):
         # This method handles all transmission of commands to Botley.
         encoded = build_and_encode(self.channel, commands, instant=instant)
-
+        send_ir(encoded)
 
     def connection_test(self):
         # Call this method and a command will be sent to Botley.
