@@ -74,12 +74,12 @@ p.add_argument("-f", "--file", help="Filename",       required=True)
 
 p.add_argument('id', nargs='+', type=str, help='IR codes')
 
-p.add_argument("--freq",      help="frequency kHz",   type=float, default=48.0)
+p.add_argument("--freq",      help="frequency kHz",   type=float, default=38.0)
 
-p.add_argument("--gap",       help="key gap ms",        type=int, default=100)
+p.add_argument("--gap",       help="key gap ms",        type=int, default=200)
 p.add_argument("--glitch",    help="glitch us",         type=int, default=100)
-p.add_argument("--post",      help="postamble ms",      type=int, default=100)
-p.add_argument("--pre",       help="preamble ms",       type=int, default=200)
+p.add_argument("--post",      help="postamble ms",      type=int, default=500)
+p.add_argument("--pre",       help="preamble ms",       type=int, default=500)
 p.add_argument("--short",     help="short code length", type=int, default=10)
 p.add_argument("--tolerance", help="tolerance percent", type=int, default=15)
 

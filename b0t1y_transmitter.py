@@ -16,7 +16,7 @@ def send_ir(encoded):
     wave = [0] * len(encoded)
 
     for i in range(0, len(encoded)):
-        ci = int(encoded[i] / 2.1)  # Hack to fix the issue where my signals were getting stretched
+        ci = int(encoded[i] / 2)  # Hack to fix the issue where my signals were getting stretched
         if i & 1:  # Space
             if ci not in spaces_wid:
                 pi.wave_add_generic([pigpio.pulse(0, 0, ci)])

@@ -22,7 +22,7 @@ class B0t1yRemote:
         # Print a message to let the user know what mode we are in
         print(f'Switched to {self.mode.capitalize()} mode')
 
-    def add_to_queue(self, command: list, times: int):
+    def add_to_queue(self, command: (list, tuple), times=1):
         for i in range(times):
             if len(self.queue) >= self.queue_limit:
                 print(f'Error: Queue limit of {self.queue_limit} commands has been reached!\n'
@@ -30,7 +30,7 @@ class B0t1yRemote:
                 break
             else:
                 self.queue.append(command)
-                print(f'{command[1].capitalize()} added at index {len(self.queue)}/{self.queue_limit} of the queue')
+                print(f'{command[1].capitalize()} added to the queue at index {len(self.queue)}/{self.queue_limit}.')
 
     def print_queue(self):
         # This method prints the current list of direction commands in the queue.
@@ -72,7 +72,7 @@ class B0t1yRemote:
 
         # Otherwise we just call the add_to_queue method to add our direction commands to the queue!
         else:
-            self.add_to_queue(self, command, times)
+            self.add_to_queue(command, times)
 
     def moves(self, directions: str, times=1):
         # The moves() method is similar to move() except that "moves()" accepts a series of direction commands
@@ -80,7 +80,10 @@ class B0t1yRemote:
         # you can program Botley using a simple string of commands like this: 'f, f, l90, f, f, l45, b, b'.
         # If a "times" parameter is passed, the entire string of commands is added to the queue "times" times.
 
-        directions = directions.split(', ')   # Here is how we split the string into a list of individual commands
+        if ',' in directions:
+            directions = directions.split(', ')   # Here is how we split the string into a list of individual commands
+        else:
+            directions = [d for d in directions]
 
         # This for loop will repeat itself "times" times; so if times = 5, the string of commands will be sent 5 times.
         for _ in range(times):
@@ -95,7 +98,7 @@ class B0t1yRemote:
 
     def transmit(self, commands: str, instant=False):
         # This method handles all transmission of commands to Botley.
-        encoded = build_and_encode(self.channel, commands, instant=instant)
+        encoded = build_and_encode(self.volume, self.channel, commands, instant=instant)
         send_ir(encoded)
 
     def connection_test(self):

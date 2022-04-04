@@ -4,9 +4,9 @@ volume_map = {
     # EX H/High volume:  '3' is the first bit of each byte in the init block,
     #                    '0' is the first bit of each byte in the address block,
     #                    '1' is the first bit of each byte in the command block
-    'H': '301',       # High
-    'L': '745',       # Low
-    'O': 'B89'        # Off
+    'H': '300',       # High
+    'L': '744',       # Low
+    'O': 'B88'        # Off
 }
 
 address_map = {
@@ -58,9 +58,9 @@ def parse_direction(direction: str):
     direction = direction.lower()  # To minimize errors, make sure direction is always lower case
 
     # The "move" dictionary maps simplified commands to the binary values that will be sent to Botley
-    move = {'f': ('1', 'forward'), 'b': ('2', 'backward'),
-            'l90': ('3', 'left90'), 'r90': ('4', 'right90'),
-            'l45': ('5', 'left45'), 'r45': ('6', 'right45')}
+    move = {'f': ['1', 'forward'], 'b': ['2', 'backward'],
+            'l90': ['3', 'left90'], 'r90': ['4', 'right90'],
+            'l45': ['5', 'left45'], 'r45': ['6', 'right45']}
 
     # The "commands" dictionary maps similar direction inputs to their common simplified "move" commands.
     # This allows us to say botley.move('forward') or botley.move('f'); both will move Botley forward.
@@ -73,6 +73,6 @@ def parse_direction(direction: str):
     # in the "move" dictionary. Because "commands[direction]" is inside of "move[]", the return value of
     # "commands[direction]" is passed as input to "move[]". "move[]" returns a list containing the
     # corresponding binary move command and a string that we can use to label the move when we print the queue.
-    command = move[commands[direction]]
+    command = commands[direction]
 
     return command
